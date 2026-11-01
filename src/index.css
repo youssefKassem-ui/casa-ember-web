@@ -216,3 +216,112 @@ textarea.input{min-height:84px;resize:vertical}
 .drop img{max-height:120px;border-radius:10px}
 .hrs{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .loginbox{max-width:380px;margin:12vh auto 0;display:grid;gap:14px}
+
+
+/* =================================
+   MOBILE RESPONSIVENESS
+================================= */
+
+@media (max-width: 699px) {
+
+  /* Customer website spacing */
+  .wrap {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  /* Menu category buttons */
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    overflow: visible;
+    gap: 8px;
+  }
+
+  .chip {
+  flex: 0 0 auto;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 42px;
+  padding: 10px 16px;
+  text-align: center;
+  white-space: normal;
+  line-height: 1.25;
+}
+
+  /* Admin dashboard spacing */
+  .adm {
+    padding: 14px 14px 40px;
+  }
+
+  /* Admin navigation: 2 columns */
+  .tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    overflow: visible;
+  }
+
+  .tab {
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 8px;
+    text-align: center;
+    white-space: normal;
+  }
+
+  /* Admin panels and forms */
+  .panel {
+    padding: 15px;
+  }
+
+  .two {
+    grid-template-columns: 1fr;
+  }
+
+  .field {
+    min-width: 0;
+  }
+
+  .input {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  /* Menu item cards */
+  .iitem {
+    padding: 13px;
+  }
+
+  .ctl {
+    gap: 8px;
+  }
+
+  /* Comfortable touch targets */
+  .adm button {
+    min-height: 40px;
+  }
+
+  .grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-items: stretch;
+  padding: 0 4px;
+}
+
+.grid > * {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.grid > *:only-child {
+  grid-column: 1 / -1;
+  width: calc(50% - 5px);
+  justify-self: center;
+}
+}
