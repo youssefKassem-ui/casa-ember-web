@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getMenu, saveMenu, login, uploadImage, imgUrl } from "./api";
 
 /* ============================================================
    SETTINGS YOU CAN CHANGE
    ============================================================ */
-const RESTAURANT = "Casa Ember";            // placeholder name
+const RESTAURANT = "ranoush";            // placeholder name
 const CUR = "$";                            // placeholder currency
 const SOCIAL = {                            // placeholder links
   instagram: "https://instagram.com/",
@@ -34,10 +34,15 @@ const STR = {
     openWa: "Open WhatsApp again", back: "Back to menu",
     hours: "Hours", address: "Address", maps: "Open in Maps", whatsapp: "WhatsApp",
     errName: "Please enter your name.", errPhone: "Enter a valid phone number.",
-    errLoc: "Please enter your delivery location.",
+    errArea: "Please enter your area.", errStreet: "Please enter the street.", errFloor: "Please enter the floor.",
+    street: "Street", floor: "Floor", areaPh: "e.g. Downtown", streetPh: "Street name or number", floorPh: "e.g. 3rd floor",
     loading: "Loading menu…", loadErr: "Could not load the menu.", retry: "Try again",
     noResults: "No dishes found.", daily: "Open daily", admin: "Admin",
     top: "Back to top", close: "Close", items: "items", noWa: "Ordering is not set up yet.",
+    bestSellers: "Best sellers", bestSub: "Our most loved dishes, picked by the chef.",
+    hoursTitle: "Opening hours", everyDay: "Every day", allDay: "Always open",
+    openNow: "Open now", closedNow: "Closed now", findUs: "Find us",
+    today: "Today", closedToday: "We are closed today. See our opening days below.",
   },
   ar: {
     viewMenu: "عرض القائمة", heroTitle: "نكهة مشوية على النار، توصيل سريع.",
@@ -58,10 +63,15 @@ const STR = {
     openWa: "افتح واتساب مرة أخرى", back: "العودة إلى القائمة",
     hours: "ساعات العمل", address: "العنوان", maps: "افتح في الخرائط", whatsapp: "واتساب",
     errName: "الرجاء إدخال اسمك.", errPhone: "أدخل رقم هاتف صحيح.",
-    errLoc: "الرجاء إدخال موقع التوصيل.",
+    errArea: "الرجاء إدخال المنطقة.", errStreet: "الرجاء إدخال الشارع.", errFloor: "الرجاء إدخال الطابق.",
+    street: "الشارع", floor: "الطابق", areaPh: "مثال: وسط المدينة", streetPh: "اسم أو رقم الشارع", floorPh: "مثال: الطابق الثالث",
     loading: "جارٍ تحميل القائمة…", loadErr: "تعذّر تحميل القائمة.", retry: "حاول مرة أخرى",
     noResults: "لا توجد أطباق.", daily: "مفتوح يوميًا", admin: "الإدارة",
     top: "إلى الأعلى", close: "إغلاق", items: "أطباق", noWa: "الطلب غير مفعّل بعد.",
+    bestSellers: "الأكثر مبيعًا", bestSub: "أطباقنا الأكثر طلبًا، اختارها الشيف.",
+    hoursTitle: "ساعات العمل", everyDay: "كل يوم", allDay: "مفتوح دائمًا",
+    openNow: "مفتوح الآن", closedNow: "مغلق الآن", findUs: "موقعنا",
+    today: "اليوم", closedToday: "نحن مغلقون اليوم. اطلع على أيام العمل أدناه.",
   },
 };
 
@@ -82,6 +92,7 @@ const ICONS = {
   fb: <path d="M7 10v4h3v7h4v-7h3l1-4h-4V8a1 1 0 011-1h3V3h-3a5 5 0 00-5 5v2H7" />,
   pin: <><circle cx="12" cy="11" r="3" /><path d="M17.66 16.66l-4.24 4.24a2 2 0 01-2.83 0l-4.25-4.24a8 8 0 1111.32 0" /></>,
   check: <path d="M5 12l5 5L20 7" />,
+  clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></>,
   back: <path d="M15 6l-6 6 6 6" />,
   edit: <><path d="M4 20h4L18.5 9.5a2.83 2.83 0 10-4-4L4 16v4" /><path d="M13.5 6.5l4 4" /></>,
   upload: <><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" /><path d="M7 9l5-5 5 5M12 4v12" /></>,
@@ -92,17 +103,34 @@ const Icon = ({ n, s = 20 }) => (
     strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{ICONS[n]}</svg>
 );
 
+// Checkout form: the delivery location is split into 3 boxes.
+const DEFAULT_FORM = { name: "", phone: "", area: "", street: "", floor: "", note: "" };
+
 const money = (n) => (Number(n) || 0).toFixed(2);
 
-// Is the restaurant open right now? (uses the visitor's clock; supports hours past midnight)
+// Days are numbered like in JavaScript: 0 = Sunday ... 6 = Saturday.
+const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
+const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];            // show Monday first
+const DAY_NAMES = {
+  en: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+  ar: ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"],
+};
+const daysOf = (m) => (Array.isArray(m.days) ? m.days : ALL_DAYS);
+const timeToMin = (s) => { const [h, mi] = s.split(":").map(Number); return h * 60 + mi; };
+
+// Is the restaurant open right now? Uses the visitor's clock.
+// Hours past midnight (e.g. 12:00 -> 02:00): after midnight it follows the PREVIOUS day.
 function isOpen(m) {
   if (!m.hoursOn) return true;
+  const days = daysOf(m);
   const now = new Date();
+  const today = now.getDay();
+  const yesterday = (today + 6) % 7;
   const cur = now.getHours() * 60 + now.getMinutes();
-  const [oh, om] = m.open.split(":").map(Number);
-  const [ch, cm] = m.close.split(":").map(Number);
-  const o = oh * 60 + om, c = ch * 60 + cm;
-  return o <= c ? cur >= o && cur < c : cur >= o || cur < c;
+  const o = timeToMin(m.open), c = timeToMin(m.close);
+  if (o === c) return days.includes(today);                                   // same time = open all day
+  if (o < c) return days.includes(today) && cur >= o && cur < c;
+  return (days.includes(today) && cur >= o) || (days.includes(yesterday) && cur < c);
 }
 
 // Like useState, but remembered in the browser (cart, language, checkout form).
@@ -175,7 +203,8 @@ export default function App() {
   const [err, setErr] = useState("");
   const [lang, setLang] = useLocal("ce_lang", "en");
   const [cart, setCart] = useLocal("ce_cart", []);                       // [{ id, size, qty }]
-  const [form, setForm] = useLocal("ce_form", { name: "", phone: "", loc: "", note: "" });
+  const [formRaw, setForm] = useLocal("ce_form2", DEFAULT_FORM);
+  const form = { ...DEFAULT_FORM, ...formRaw };
   const [errors, setErrors] = useState({});
   const [view, setView] = useState("shop");                              // shop | admin
   const [drawer, setDrawer] = useState(null);                            // null | cart | checkout | done
@@ -189,19 +218,26 @@ export default function App() {
 
   const t = (k) => STR[lang][k] ?? STR.en[k] ?? k;
 
-  const load = () => {
-  setErr("");
-  getMenu()
-    .then(setMenu)
-    .catch((e) => setErr(e.message));
-};
+  const load = () => { setErr(""); getMenu().then(setMenu).catch((e) => setErr(e.message)); };
+ useEffect(() => {
+  let cancelled = false;
 
-useEffect(() => {
   getMenu()
-    .then(setMenu)
-    .catch((e) => setErr(e.message));
+    .then((data) => {
+      if (!cancelled) {
+        setMenu(data);
+      }
+    })
+    .catch((e) => {
+      if (!cancelled) {
+        setErr(e.message);
+      }
+    });
+
+  return () => {
+    cancelled = true;
+  };
 }, []);
-
   // Language + direction (RTL for Arabic)
   useEffect(() => {
     document.documentElement.lang = lang;
@@ -229,7 +265,7 @@ useEffect(() => {
       address: menu.addr || undefined, hasMap: menu.map || undefined,
       telephone: menu.wa ? "+" + menu.wa : undefined,
       servesCuisine: "Wood-fired", priceRange: "$$",
-      openingHours: menu.hoursOn ? `Mo-Su ${menu.open}-${menu.close}` : undefined,
+      openingHours: menu.hoursOn ? `${daysOf(menu).map((d) => ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"][d]).join(",")} ${menu.open}-${menu.close}` : undefined,
       url: window.location.href,
     };
     let s = document.getElementById("ld");
@@ -284,6 +320,14 @@ useEffect(() => {
       (!ql || [i.name, i.nameAr, i.desc, i.descAr, i.cat].some((s) => (s || "").toLowerCase().includes(ql)))
   );
 
+  // Best sellers = dishes marked with the ★ Pick toggle in the admin (and still available)
+  const bests = menu.items.filter((i) => i.pick && i.on);
+
+  // Map: built from the address typed in Admin > Settings (no API key needed)
+  const addr = (menu.addr || "").trim();
+  const mapEmbed = `https://maps.google.com/maps?q=${encodeURIComponent(addr)}&output=embed`;
+  const mapLink = menu.map || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`;
+
   /* ----- WhatsApp order ----- */
   const waUrl = () => {
     const rows = lines.map((l) => `${l.qty} × ${l.it.name}${l.size ? ` (${l.size})` : ""} – ${CUR}${money(l.total)}`);
@@ -291,7 +335,9 @@ useEffect(() => {
       `*New order – ${RESTAURANT}*`, "",
       `Name: ${form.name.trim()}`,
       `Phone: ${form.phone.trim()}`,
-      `Location: ${form.loc.trim()}`,
+      `Area: ${form.area.trim()}`,
+      `Street: ${form.street.trim()}`,
+      `Floor: ${form.floor.trim()}`,
       form.note.trim() ? `Note: ${form.note.trim()}` : null,
       "", "*Items*", ...rows, "",
       `Delivery fee: ${CUR}${money(fee)}`,
@@ -304,7 +350,9 @@ useEffect(() => {
     const e = {};
     if (form.name.trim().length < 2) e.name = t("errName");
     if (!/^\d{7,15}$/.test(form.phone.replace(/[\s()+-]/g, ""))) e.phone = t("errPhone");
-    if (form.loc.trim().length < 3) e.loc = t("errLoc");
+    if (form.area.trim().length < 2) e.area = t("errArea");
+    if (form.street.trim().length < 2) e.street = t("errStreet");
+    if (form.floor.trim().length < 1) e.floor = t("errFloor");
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -316,8 +364,9 @@ useEffect(() => {
   };
 
   const finish = () => { setCart([]); setDrawer(null); };
-  const field = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
-  const closedText = menu.hoursOn ? t("closedMsg").replace("{o}", menu.open).replace("{c}", menu.close) : "";
+  const field = (k) => (e) => setForm((f) => ({ ...DEFAULT_FORM, ...f, [k]: e.target.value }));
+  const todayOff = menu.hoursOn && !daysOf(menu).includes(new Date().getDay());
+  const closedText = !menu.hoursOn ? "" : todayOff ? t("closedToday") : t("closedMsg").replace("{o}", menu.open).replace("{c}", menu.close);
 
   /* ----- pieces of UI ----- */
   const renderDrawer = () => {
@@ -392,9 +441,18 @@ useEffect(() => {
                 <label className="field"><span>{t("phone")}</span>
                   <input className={"input" + (errors.phone ? " bad" : "")} value={form.phone} onChange={field("phone")} inputMode="tel" autoComplete="tel" />
                   {errors.phone && <span className="err">{errors.phone}</span>}</label>
-                <label className="field"><span>{t("location")}</span>
-                  <input className={"input" + (errors.loc ? " bad" : "")} value={form.loc} onChange={field("loc")} autoComplete="street-address" />
-                  {errors.loc && <span className="err">{errors.loc}</span>}</label>
+                <div className="locbox">
+                  <b>{t("location")}</b>
+                  <label className="field"><span>{t("area")}</span>
+                    <input className={"input" + (errors.area ? " bad" : "")} value={form.area} onChange={field("area")} placeholder={t("areaPh")} autoComplete="address-level2" />
+                    {errors.area && <span className="err">{errors.area}</span>}</label>
+                  <label className="field"><span>{t("street")}</span>
+                    <input className={"input" + (errors.street ? " bad" : "")} value={form.street} onChange={field("street")} placeholder={t("streetPh")} autoComplete="address-line1" />
+                    {errors.street && <span className="err">{errors.street}</span>}</label>
+                  <label className="field"><span>{t("floor")}</span>
+                    <input className={"input" + (errors.floor ? " bad" : "")} value={form.floor} onChange={field("floor")} placeholder={t("floorPh")} autoComplete="address-line2" />
+                    {errors.floor && <span className="err">{errors.floor}</span>}</label>
+                </div>
                 <label className="field"><span>{t("note")} <i>({t("optional")})</i></span>
                   <textarea className="input" value={form.note} onChange={field("note")} placeholder={t("notePh")} /></label>
               </div>
@@ -512,6 +570,62 @@ useEffect(() => {
             </div>
           )}
         </section>
+
+        {/* ---------- Best sellers (dishes marked ★ Pick) ---------- */}
+        {bests.length > 0 && (
+          <section className="wrap sec" id="best">
+            <h2><Icon n="star" s={22} /> {t("bestSellers")}</h2>
+            <p className="muted sub">{t("bestSub")}</p>
+            <div className="grid">
+              {bests.map((it) => (
+                <Card key={"best-" + it.id} it={it} lang={lang} t={t} open={open} catLabel={catLabel} qtyOf={qtyOf}
+                  idx={sel[it.id] ?? 0} onSize={(id, i) => setSel((s) => ({ ...s, [id]: i }))}
+                  onQty={setQty} onOpen={setModal} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ---------- Opening hours ---------- */}
+        <section className="wrap sec" id="hours">
+          <div className="hcard">
+            <div className="hh">
+              <div className="ht"><Icon n="clock" s={22} /><h3>{t("hoursTitle")}</h3></div>
+              <span className={"on1" + (open ? "" : " off1")}>{open ? t("openNow") : t("closedNow")}</span>
+            </div>
+            {menu.hoursOn ? (
+              DAY_ORDER.map((d) => {
+                const isOpenDay = daysOf(menu).includes(d);
+                const isToday = d === new Date().getDay();
+                return (
+                  <div className={"hrow" + (isToday ? " today" : "")} key={d}>
+                    <span>{DAY_NAMES[lang][d]}{isToday && <em className="tp">{t("today")}</em>}</span>
+                    {isOpenDay ? <b>{menu.open} – {menu.close}</b> : <b className="x">{t("closed")}</b>}
+                  </div>
+                );
+              })
+            ) : (
+              <div className="hrow"><span>{t("everyDay")}</span><b>{t("allDay")}</b></div>
+            )}
+          </div>
+        </section>
+
+        {/* ---------- Location + map ---------- */}
+        {addr && (
+          <section className="wrap sec" id="find">
+            <h2>{t("findUs")}</h2>
+            <div className="locrow">
+              <span className="lp"><Icon n="pin" s={22} /></span>
+              <div>
+                <b>{addr}</b>
+                <a href={mapLink} target="_blank" rel="noopener noreferrer">{t("maps")}</a>
+              </div>
+            </div>
+            <div className="mapbox">
+              <iframe title={t("findUs")} src={mapEmbed} loading="lazy" referrerPolicy="no-referrer-when-downgrade" allowFullScreen />
+            </div>
+          </section>
+        )}
       </main>
 
       <footer className="foot">
@@ -594,48 +708,70 @@ function Login({ setToken, onExit }) {
 function Dashboard({ menu, onMenu, token, setToken, onExit }) {
   const [tab, setTab] = useState("overview");
   // Local working copy. fee/min are strings while typing.
-  const [adm, setAdm] = useState(() => ({ ...menu, catAr: menu.catAr || {}, fee: String(menu.fee), min: String(menu.min) }));
+  const [adm, setAdm] = useState(() => ({ ...menu, catAr: menu.catAr || {}, fee: String(menu.fee), min: String(menu.min), days: daysOf(menu) }));
   const [status, setStatus] = useState("saved");        // saved | saving | error
   const [msg, setMsg] = useState("");
-  const dirty = useRef(false);
+  const [dirty, setDirty] = useState(false);
 
   const [form, setForm] = useState(null);               // dish being added / edited
   const [ferr, setFerr] = useState("");
   const [busy, setBusy] = useState(false);
   const [newCat, setNewCat] = useState({ name: "", ar: "" });
 
-  const logout = () => { sessionStorage.removeItem("ce_token"); setToken(""); };
-  const change = (fn) => {
-  setAdm((prev) => {
-    dirty.current = true;
-    return fn(prev);
-  });
+  const logout = useCallback(() => {
+  sessionStorage.removeItem("ce_token");
+  setToken("");
+}, [setToken]);
+ const change = (fn) => {
+  setDirty(true);
+  setStatus("saving");
+  setAdm((prev) => fn(prev));
 };
 
   // AUTO-SAVE: 0.7s after the last change, send the whole menu to the API.
-  useEffect(() => {
-    if (!dirty.current) return;
-    setStatus("saving");
-    const h = setTimeout(async () => {
-      try {
-        const body = { ...adm, fee: Number(adm.fee) || 0, min: Number(adm.min) || 0 };
-        const saved = await saveMenu(body, token);
-        onMenu(saved);
-        dirty.current = false;
-        setStatus("saved"); setMsg("");
-      } catch (e) {
-        if (e.status === 401) { logout(); return; }
-        setStatus("error"); setMsg(e.message);
-      }
-    }, 700);
-    return () => clearTimeout(h);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adm]);
+ useEffect(() => {
+  if (!dirty) return;
 
-  const set = (k) => (e) => {
+  const h = setTimeout(async () => {
+    try {
+      const body = {
+        ...adm,
+        fee: Number(adm.fee) || 0,
+        min: Number(adm.min) || 0,
+      };
+
+      const saved = await saveMenu(body, token);
+
+      onMenu(saved);
+      setDirty(false);
+      setStatus("saved");
+      setMsg("");
+    } catch (e) {
+      if (e.status === 401) {
+        logout();
+        return;
+      }
+
+      setStatus("error");
+      setMsg(e.message);
+    }
+  }, 700);
+
+  return () => clearTimeout(h);
+}, [adm, dirty, token, onMenu, logout]);
+
+ const set = (k) => (e) => {
   const value = e.target.value;
+
   change((a) => ({ ...a, [k]: value }));
 };
+
+  // Tap a day to make it an off day (or open again). At least one day must stay open.
+  const toggleDay = (d) => change((a) => {
+    const cur = daysOf(a);
+    if (cur.includes(d)) return cur.length === 1 ? a : { ...a, days: cur.filter((x) => x !== d) };
+    return { ...a, days: [...cur, d].sort((x, y) => x - y) };
+  });
 
   /* ---------- dish form ---------- */
   const blank = () => ({ id: 0, name: "", nameAr: "", desc: "", descAr: "", emoji: "🍕", img: "", price: "", on: true, pick: false, cat: adm.cats[0] || "", sizes: [] });
@@ -861,13 +997,26 @@ function Dashboard({ menu, onMenu, token, setToken, onExit }) {
             </div>
           </div>
           <div className="panel">
-            <h2>Opening hours</h2>
+            <h2>Opening days &amp; hours</h2>
+            <label className="ctl" style={{ gap: 10 }}><Toggle on={adm.hoursOn} onChange={(v) => change((a) => ({ ...a, hoursOn: v }))} label="Use opening days and hours" /> Use opening days &amp; hours</label>
+            <div>
+              <span style={{ fontSize: ".82rem", fontWeight: 700 }}>Open days (tap a day to make it an off day)</span>
+              <div className="daypick">
+                {DAY_ORDER.map((d) => {
+                  const on = daysOf(adm).includes(d);
+                  return (
+                    <button key={d} type="button" className={"dchip" + (on ? " on" : "")} aria-pressed={on} onClick={() => toggleDay(d)}>
+                      {DAY_NAMES.en[d].slice(0, 3)}<small>{on ? "Open" : "Off"}</small>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <div className="hrs">
-              <label className="ctl" style={{ gap: 10 }}><Toggle on={adm.hoursOn} onChange={(v) => change((a) => ({ ...a, hoursOn: v }))} label="Use opening hours" /> Use opening hours</label>
               <label className="field"><span>Opens</span><input className="input" type="time" value={adm.open} onChange={set("open")} /></label>
               <label className="field"><span>Closes</span><input className="input" type="time" value={adm.close} onChange={set("close")} /></label>
             </div>
-            <p className="muted">Changes save automatically.</p>
+            <p className="muted">The same hours apply to every open day. On an off day the site shows "closed" and ordering is blocked. Changes save automatically.</p>
           </div>
         </>
       )}

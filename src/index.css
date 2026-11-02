@@ -217,6 +217,39 @@ textarea.input{min-height:84px;resize:vertical}
 .hrs{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .loginbox{max-width:380px;margin:12vh auto 0;display:grid;gap:14px}
 
+/* ---------- Best sellers, hours, map (added) ---------- */
+.sec h2 svg{color:var(--red);vertical-align:-3px;margin-inline-end:4px}
+.sub{margin:-6px 0 14px;font-size:.9rem}
+.hcard{background:var(--card);border:1px solid var(--line);border-radius:22px;overflow:hidden}
+.hh{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px}
+.ht{display:flex;align-items:center;gap:10px}
+.ht svg{color:var(--red)}
+.ht h3{font-size:1.2rem}
+.on1{background:#0e2a17;color:var(--green);font-size:.75rem;font-weight:700;padding:4px 11px;border-radius:99px;white-space:nowrap}
+.on1.off1{background:#2a0a08;color:#ff8a84}
+.hrow{display:flex;justify-content:space-between;gap:10px;padding:14px 16px;border-top:1px solid var(--line);font-size:.95rem}
+.hrow span{color:var(--mut)}
+.locrow{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.lp{width:44px;height:44px;border-radius:50%;background:#2a0a08;color:var(--red);display:grid;place-items:center;flex:none}
+.locrow b{display:block;font-size:1.05rem}
+.locrow a{color:var(--red);font-weight:600;font-size:.88rem}
+.mapbox{width:100%;height:clamp(230px,55vw,400px);border-radius:22px;overflow:hidden;border:1px solid var(--line);background:var(--card2)}
+.mapbox iframe{width:100%;height:100%;border:0;display:block;filter:invert(92%) hue-rotate(180deg) contrast(.95)} /* dark map: delete this filter line for the normal colours */
+
+/* ---------- Checkout location boxes (added) ---------- */
+.locbox{display:grid;gap:12px;background:#111;border:1px solid var(--line);border-radius:18px;padding:14px}
+.locbox>b{font-size:.9rem}
+
+/* ---------- Opening days (added) ---------- */
+.hrow{align-items:center}
+.hrow.today{background:#2a0a08}
+.hrow.today span{color:var(--text);font-weight:700}
+.hrow b.x{color:#ff8a84}
+.tp{background:var(--red);color:#fff;font-style:normal;font-size:.68rem;font-weight:700;padding:1px 8px;border-radius:99px;margin-inline-start:8px}
+.daypick{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:8px}
+.dchip{display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 0;border-radius:14px;border:1px solid var(--line);background:var(--bg);font-weight:700;font-size:.82rem;color:var(--mut);transition:.2s}
+.dchip small{font-size:.62rem;font-weight:600}
+.dchip.on{background:var(--red);border-color:var(--red);color:#fff}
 
 /* =================================
    MOBILE RESPONSIVENESS
